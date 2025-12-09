@@ -96,6 +96,21 @@ async def analyze_single_event(
         "t60_hit": None,
         "one_sentence_summary": None,
         "error": None,
+        # Additional LLM output fields
+        "eps_strength": None,
+        "revenue_strength": None,
+        "overall_numbers_strength": None,
+        "overall_tone": None,
+        "prepared_tone": None,
+        "qa_tone": None,
+        "neg_temporary_ratio": None,
+        "pos_temporary_ratio": None,
+        "key_temporary_factors": None,
+        "key_structural_factors": None,
+        "skeptical_question_ratio": None,
+        "followup_ratio": None,
+        "topic_concentration": None,
+        "risk_focus_score": None,
     }
 
     try:
@@ -178,6 +193,22 @@ async def analyze_single_event(
         result["one_sentence_summary"] = features.one_sentence_summary
         print(f"  Summary: {features.one_sentence_summary}")
 
+        # Store all LLM output fields
+        result["eps_strength"] = features.numbers.eps_strength
+        result["revenue_strength"] = features.numbers.revenue_strength
+        result["overall_numbers_strength"] = features.numbers.overall_numbers_strength
+        result["overall_tone"] = features.tone.overall_tone
+        result["prepared_tone"] = features.tone.prepared_tone
+        result["qa_tone"] = features.tone.qa_tone
+        result["neg_temporary_ratio"] = features.narrative.neg_temporary_ratio
+        result["pos_temporary_ratio"] = features.narrative.pos_temporary_ratio
+        result["key_temporary_factors"] = "; ".join(features.narrative.key_temporary_factors) if features.narrative.key_temporary_factors else ""
+        result["key_structural_factors"] = "; ".join(features.narrative.key_structural_factors) if features.narrative.key_structural_factors else ""
+        result["skeptical_question_ratio"] = features.skepticism.skeptical_question_ratio
+        result["followup_ratio"] = features.skepticism.followup_ratio
+        result["topic_concentration"] = features.skepticism.topic_concentration
+        result["risk_focus_score"] = features.risk_focus_score
+
         # Calculate signals (no historical risk scores for single event)
         signals = calculate_all_signals(
             raw=earning,
@@ -243,23 +274,45 @@ async def main():
 
     all_results = []
 
+    def print_interim_summary(results, title):
+        """Print interim summary table."""
+        print(f"\n{'='*80}")
+        print(f"INTERIM SUMMARY: {title}")
+        print(f"{'='*80}")
+        print(f"{'Symbol':<6} {'Date':<12} {'Day0':>8} {'Signal':<8} {'T+30':>8} {'T+60':>8} {'Hit'}")
+        print("-" * 80)
+        for r in results:
+            d0 = f"{r['day0_return']:+.1%}" if r.get('day0_return') else "N/A"
+            sig = r.get('final_signal_direction', 'N/A')[:4]
+            t30 = f"{r['t30_return']:+.1%}" if r.get('t30_return') is not None else "N/A"
+            t60 = f"{r['t60_return']:+.1%}" if r.get('t60_return') is not None else "N/A"
+            hit30 = "✓" if r.get('t30_hit') == True else ("✗" if r.get('t30_hit') == False else "-")
+            hit60 = "✓" if r.get('t60_hit') == True else ("✗" if r.get('t60_hit') == False else "-")
+            print(f"{r['symbol']:<6} {r['event_date']:<12} {d0:>8} {sig:<8} {t30:>8} {t60:>8} {hit30}/{hit60}")
+
     # Analyze Top 10 Gainers
     print("\n" + "=" * 80)
     print("TOP 10 GAINERS")
     print("=" * 80)
 
-    for symbol, date, move in TOP_GAINERS:
+    for i, (symbol, date, move) in enumerate(TOP_GAINERS):
         result = await analyze_single_event(symbol, date, move, "GAINER")
         all_results.append(result)
+        # Print interim summary every 5 stocks
+        if (i + 1) % 5 == 0:
+            print_interim_summary([r for r in all_results if r["category"] == "GAINER"], f"Gainers ({i+1}/10)")
 
     # Analyze Top 10 Losers
     print("\n" + "=" * 80)
     print("TOP 10 LOSERS")
     print("=" * 80)
 
-    for symbol, date, move in TOP_LOSERS:
+    for i, (symbol, date, move) in enumerate(TOP_LOSERS):
         result = await analyze_single_event(symbol, date, move, "LOSER")
         all_results.append(result)
+        # Print interim summary every 5 stocks
+        if (i + 1) % 5 == 0:
+            print_interim_summary([r for r in all_results if r["category"] == "LOSER"], f"Losers ({i+1}/10)")
 
     # Summary
     print("\n" + "=" * 80)
@@ -304,14 +357,21 @@ async def main():
     if t60_trades:
         print(f"T+60 Hit Rate: {t60_hits}/{len(t60_trades)} = {t60_hits/len(t60_trades):.1%}")
 
-    # Write CSV
-    csv_path = Path(__file__).parent / "extreme_moves_results.csv"
+    # Write CSV with all LLM output fields
+    csv_path = Path(__file__).parent / "extreme_moves_results_v2.csv"
     fieldnames = [
         "category", "symbol", "event_date", "expected_move",
         "day0_return", "final_signal_score", "final_signal_direction",
         "tone_numbers_score", "prepared_qa_score", "regime_shift_score",
         "temp_struct_score", "analyst_skepticism_score",
         "t30_return", "t30_hit", "t60_return", "t60_hit",
+        # All LLM output fields
+        "eps_strength", "revenue_strength", "overall_numbers_strength",
+        "overall_tone", "prepared_tone", "qa_tone",
+        "neg_temporary_ratio", "pos_temporary_ratio",
+        "key_temporary_factors", "key_structural_factors",
+        "skeptical_question_ratio", "followup_ratio", "topic_concentration",
+        "risk_focus_score",
         "one_sentence_summary", "error"
     ]
 
