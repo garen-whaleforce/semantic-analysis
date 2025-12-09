@@ -1,0 +1,25 @@
+# Semantic Earnings Reversal Framework
+# Python 3.11+
+
+# Web Framework
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+
+# Templates
+jinja2==3.1.3
+
+# HTTP Client
+httpx==0.26.0
+
+# Data Validation
+pydantic==2.6.1
+pydantic-settings==2.1.0
+
+# Azure OpenAI
+openai>=1.50.0
+
+# Environment Variables
+python-dotenv==1.0.1
+
+# PostgreSQL Database
+psycopg2-binary==2.9.9
